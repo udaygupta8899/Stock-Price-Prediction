@@ -18,7 +18,7 @@ A comprehensive stock analysis system that combines real-time market data with s
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/stock-price-prediction.git
+git clone https://github.com/udaygupta8899/stock-price-prediction.git
 cd stock-price-prediction
 ```
 
