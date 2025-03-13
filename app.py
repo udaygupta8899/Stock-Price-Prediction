@@ -371,8 +371,22 @@ def main():
                         """, unsafe_allow_html=True)
                     
                     # Add prediction confidence indicator with news status
-                    confidence_text = "Based on technical analysis only" if news_count == 0 else f"Based on analysis of {news_count} recent news articles"
-                    confidence_color = "#FFC107" if news_count == 0 else "#4CAF50"
+                    # Force news_count to be positive for mocked news
+                    has_news_data = news_count > 0
+                    confidence_text = "Based on analysis of recent news and market data" if has_news_data else "Based on technical analysis only"
+                    confidence_color = "#4CAF50" if has_news_data else "#FFC107"
+                    
+                    # Get the news articles from UI to check if they match with the model
+                    ui_news_articles = get_relevant_news(selected_stock_name, selected_stock)
+                    ui_has_news = len(ui_news_articles) > 0
+                    
+                    # Additional debug info
+                    st.sidebar.markdown(f"""
+                    <div style="font-size: 0.8rem; color: #888;">
+                    - UI shows {len(ui_news_articles)} news articles
+                    - News data match: {"Yes" if (has_news_data == ui_has_news) else "No"}
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     st.markdown(f"""
                     <div class="metric-card">
@@ -380,7 +394,7 @@ def main():
                         <p style="color: {confidence_color}">{confidence_text}</p>
                         <p>Model confidence: {abs(price_change):.1f}%</p>
                         <p style="font-size: 0.9rem; color: #888;">
-                            {f"Note: No recent news articles found. Prediction based on historical price patterns." if news_count == 0 else ""}
+                            {f"Note: No recent news articles found. Prediction based on historical price patterns." if not has_news_data else f"Based on analysis of {news_count} news articles and market trends."}
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
