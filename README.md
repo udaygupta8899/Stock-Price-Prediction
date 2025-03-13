@@ -80,3 +80,4 @@ The system uses FinBERT, a financial domain-specific BERT model, to analyze news
 ## Contributing
 
 Feel free to submit issues and enhancement requests! 
+bb35f7cda12d2397a654f04b758437b12c643f41
