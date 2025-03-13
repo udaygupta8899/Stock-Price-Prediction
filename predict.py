@@ -118,6 +118,7 @@ class StockPredictor:
         
         # Get news data
         news_articles = self.get_news_data(symbol)
+        print(f"Retrieved {len(news_articles)} news articles for {symbol}")
         
         # Get sentiment embeddings for all articles
         sentiment_embeddings = []
@@ -156,10 +157,17 @@ class StockPredictor:
                 adjustment_factor = 1.0 / adjustment_factor
             prediction = original_current_price * adjustment_factor
         
+        # Ensure news_count is at least the number of mock news articles when using fallback
+        actual_news_count = len(news_articles)
+        if isinstance(news_articles, list) and actual_news_count > 0:
+            # This ensures we recognize when we're using mock news
+            is_mock_news = len(news_articles) > 0 and isinstance(news_articles[0], str) and news_articles[0].startswith(symbol.split('.')[0])
+            print(f"Using {'mock' if is_mock_news else 'real'} news for {symbol}, count: {actual_news_count}")
+        
         return {
             'predicted_price': prediction,
             'current_price': original_current_price,
-            'news_count': len(news_articles)
+            'news_count': actual_news_count
         }
 
 def main():
