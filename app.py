@@ -22,8 +22,10 @@ def get_finbert_analyzer():
     "torch.nn.parameter.Parameter": lambda _: None,
     "_torch.torch.classes": lambda _: None,
     "torch._classes": lambda _: None
-})
+}, ttl=1)  # Adding a short time-to-live to refresh predictor
 def get_stock_predictor():
+    # Version 2: Now supports external_news parameter
+    print("Initializing new StockPredictor instance...")
     return StockPredictor(
         model_path="tft_model.ckpt",
         scaler_path="scaler.joblib"
@@ -157,6 +159,12 @@ all_stocks = {
 # Sidebar Configuration
 st.sidebar.title("📈 Stock Dashboard")
 st.sidebar.markdown("---")
+
+# Add a button to clear cache
+if st.sidebar.button("🔄 Refresh Model"):
+    st.cache_resource.clear()
+    st.sidebar.success("✅ Cache cleared! Model will reload.")
+
 selected_stock_name = st.sidebar.selectbox(
     "Select Company",
     list(all_stocks.keys()),
@@ -331,7 +339,13 @@ def main():
                 
                 # Then use the same news articles for prediction
                 predictor = get_stock_predictor()
-                prediction_result = predictor.predict(selected_stock, external_news=news_articles)
+                try:
+                    # Try with external_news parameter (new version)
+                    prediction_result = predictor.predict(selected_stock, external_news=news_articles)
+                except TypeError as e:
+                    # Fall back to old version without external_news parameter
+                    st.sidebar.warning("Using legacy prediction model. Please refresh the model to use news data.")
+                    prediction_result = predictor.predict(selected_stock)
                 
                 if prediction_result:
                     # Use the same current price as displayed in key metrics
