@@ -60,7 +60,12 @@ st.markdown("""
 def get_finbert_analyzer():
     return FinBERTAnalyzer()
 
-@st.cache_resource
+@st.cache_resource(hash_funcs={
+    "torch._C._TensorBase": lambda _: None,
+    "torch.nn.parameter.Parameter": lambda _: None,
+    "_torch.torch.classes": lambda _: None,
+    "torch._classes": lambda _: None
+})
 def get_stock_predictor():
     return StockPredictor(
         model_path="tft_model.ckpt",
