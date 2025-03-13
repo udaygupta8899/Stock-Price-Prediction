@@ -320,8 +320,18 @@ def main():
         
         with st.spinner("Generating price prediction..."):
             try:
+                # First, get the news articles that will be shown in UI
+                news_articles = get_relevant_news(selected_stock_name, selected_stock)
+                st.sidebar.markdown(f"""
+                <div style="font-size: 0.8rem; color: #888; margin-top: 1rem;">
+                Debug info:
+                - UI has {len(news_articles)} news articles available
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Then use the same news articles for prediction
                 predictor = get_stock_predictor()
-                prediction_result = predictor.predict(selected_stock)
+                prediction_result = predictor.predict(selected_stock, external_news=news_articles)
                 
                 if prediction_result:
                     # Use the same current price as displayed in key metrics
@@ -331,9 +341,9 @@ def main():
                     
                     # Print debug information
                     st.sidebar.markdown(f"""
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 1rem;">
-                    Debug info:
+                    <div style="font-size: 0.8rem; color: #888;">
                     - Prediction uses {news_count} news articles
+                    - Same news articles used for UI and prediction
                     </div>
                     """, unsafe_allow_html=True)
                     
@@ -371,22 +381,9 @@ def main():
                         """, unsafe_allow_html=True)
                     
                     # Add prediction confidence indicator with news status
-                    # Force news_count to be positive for mocked news
                     has_news_data = news_count > 0
                     confidence_text = "Based on analysis of recent news and market data" if has_news_data else "Based on technical analysis only"
                     confidence_color = "#4CAF50" if has_news_data else "#FFC107"
-                    
-                    # Get the news articles from UI to check if they match with the model
-                    ui_news_articles = get_relevant_news(selected_stock_name, selected_stock)
-                    ui_has_news = len(ui_news_articles) > 0
-                    
-                    # Additional debug info
-                    st.sidebar.markdown(f"""
-                    <div style="font-size: 0.8rem; color: #888;">
-                    - UI shows {len(ui_news_articles)} news articles
-                    - News data match: {"Yes" if (has_news_data == ui_has_news) else "No"}
-                    </div>
-                    """, unsafe_allow_html=True)
                     
                     st.markdown(f"""
                     <div class="metric-card">
