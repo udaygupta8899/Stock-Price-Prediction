@@ -7,416 +7,334 @@ from datetime import datetime, timedelta
 from time import sleep
 from random import randint
 from finbert_analyzer import FinBERTAnalyzer
+import torch
+from predict import StockPredictor
+import numpy as np
 
-# Initialize FinBERT analyzer
+# Set page config
+st.set_page_config(
+    page_title="Stock Market Dashboard",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+    }
+    .metric-card {
+        background-color: #2D2D2D;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .divider {
+        height: 2px;
+        background-color: #4CAF50;
+        margin: 20px 0;
+    }
+    h1, h2, h3 {
+        color: #4CAF50;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Initialize FinBERT analyzer and TFT predictor
 @st.cache_resource
 def get_finbert_analyzer():
     return FinBERTAnalyzer()
 
-# Set page config for wide mode and title
-st.set_page_config(
-    page_title="Stock Dashboard",
-    layout="wide",  # Enable wide mode by default
-    initial_sidebar_state="expanded"
-)
-st.markdown("""
-<style>
-    :root {
-        --primary: #4FC3F7;
-        --background: #0E1117;  /* Dark background */
-        --card-bg: rgba(255, 255, 255, 0.05);  /* Transparent card */
-        --text-color: #ffffff;
-        --hover-color: #4FC3F7;
-    }
+@st.cache_resource
+def get_stock_predictor():
+    return StockPredictor(
+        model_path="tft_model.ckpt",
+        scaler_path="scaler.joblib"
+    )
 
-    .stApp {
-        background: var(--background);
-        color: var(--text-color);
-        font-family: 'Segoe UI', sans-serif;
-    }
-
-    .metric-card {
-        background: var(--card-bg);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .metric-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    }
-
-    .news-card {
-        background: var(--card-bg);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        transition: transform 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .news-card:hover {
-        transform: translateY(-3px);
-    }
-
-    h1, h2, h3 {
-        color: var(--hover-color) !important;
-        margin-bottom: 1rem !important;
-    }
-
-    a {
-        color: var(--hover-color);
-        text-decoration: none;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
-
-    .divider {
-        height: 2px;
-        background: linear-gradient(90deg, var(--hover-color) 0%, transparent 100%);
-        margin: 2rem 0;
-    }
-
-    .st-bb { background-color: transparent; }
-    .st-at { background-color: var(--hover-color) !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# Stock list
-all_stocks = {
-    "Infosys": "INFY.NS",
-    "HDFC Bank": "HDFCBANK.NS",
-    "Reliance Industries": "RELIANCE.NS",
-    "ICICI Bank": "ICICIBANK.NS",
-    "Axis Bank": "AXISBANK.NS",
-    "Kotak Mahindra Bank": "KOTAKBANK.NS",
-    "State Bank of India": "SBIN.NS",
-    "Larsen & Toubro": "LT.NS",
-    "Bajaj Finance": "BAJFINANCE.NS",
-    "Hindustan Unilever": "HINDUNILVR.NS",
-    "Tata Consultancy Services": "TCS.NS",
-    "Maruti Suzuki": "MARUTI.NS",
-    "Mahindra & Mahindra": "M&M.NS",
-    "ITC": "ITC.NS",
-    "Asian Paints": "ASIANPAINT.NS",
-    "Sun Pharma": "SUNPHARMA.NS",
-    "Dr. Reddy's Laboratories": "DRREDDY.NS",
-    "Tata Motors": "TATAMOTORS.NS",
-    "Bajaj Finserv": "BAJAJFINSV.NS",
-    "Nestle India": "NESTLEIND.NS",
-    "Britannia Industries": "BRITANNIA.NS",
-    "Wipro": "WIPRO.NS",
-    "Tech Mahindra": "TECHM.NS",
-    "IndusInd Bank": "INDUSINDBK.NS",
-    "Power Grid Corporation": "POWERGRID.NS",
-    "Adani Enterprises": "ADANIENT.NS",
-    "Adani Ports": "ADANIPORTS.NS",
-    "Adani Green Energy": "ADANIGREEN.NS",
-    "Adani Transmission": "ADANITRANS.NS",
-    "GAIL": "GAIL.NS",
-    "NTPC": "NTPC.NS",
-    "Coal India": "COALINDIA.NS",
-    "JSW Steel": "JSWSTEEL.NS",
-    "Tata Steel": "TATASTEEL.NS",
-    "Bharti Airtel": "BHARTIARTL.NS",
-    "HCL Technologies": "HCLTECH.NS",
-    "Eicher Motors": "EICHERMOT.NS",
-    "UltraTech Cement": "ULTRACEMCO.NS",
-    "Cipla": "CIPLA.NS",
-    "Grasim Industries": "GRASIM.NS",
-    "HDFC Life Insurance": "HDFCLIFE.NS",
-    "ICICI Prudential Life": "ICICIPRULI.NS",
-    "Divi's Laboratories": "DIVISLAB.NS",
-    "Titan Company": "TITAN.NS",
-    "Hero MotoCorp": "HEROMOTOCO.NS",
-    "Zee Entertainment": "ZEEL.NS",
-    "Apollo Hospitals": "APOLLOHOSP.NS",
-    # Add more stocks if needed...
-}
-
-# Sidebar Configuration
-st.sidebar.title("📈 Stock Dashboard")
-st.sidebar.markdown("---")
-selected_stock_name = st.sidebar.selectbox(
-    "Select Company",
-    list(all_stocks.keys()),
-    format_func=lambda x: f"{x} ({all_stocks[x]})"
-)
-selected_stock = all_stocks[selected_stock_name]
-
-st.sidebar.markdown("---")
-selected_period = st.sidebar.selectbox(
-    "Time Period",
-    ["1d", "1wk", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"],
-    index=4
-)
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Chart Settings")
-candlestick_ma = st.sidebar.checkbox("Show Moving Averages", value=True)
-show_bollinger = st.sidebar.checkbox("Show Bollinger Bands", value=False)
-show_rsi = st.sidebar.checkbox("Show RSI", value=False)
-
-# Function to fetch stock data with retries and error handling, updated for 1-hour interval
-@st.cache_data(ttl=600)
-def fetch_stock_data(symbol, period):
-    retry_count = 3
-    for _ in range(retry_count):
-        try:
-            stock = yf.Ticker(symbol)
-            if period == "1h":
-                df = stock.history(period="1d", interval="1m")
-                if df.empty:
-                    st.warning("No data found for the last 1 hour. Trying with broader period.")
-                    # Try fetching data with 5-minute intervals if 1m doesn't work
-                    df = stock.history(period="1d", interval="5m")
-
-            else:
-                df = stock.history(period=period)  # Fetch data for other periods (daily, weekly, etc.)
-            info = stock.info
-            return df, info
-        except Exception as e:
-            st.warning(f"Error fetching data (attempting retry): {e}")
-            sleep(randint(1, 3))  # Adding random delay before retry
-    st.error("Failed to fetch stock data after multiple attempts.")
-    return None, None
-
-
-# Improved news filtering
-# Improved news filtering using full company name and ticker symbol
-def get_relevant_news(stock_name, ticker):
-    news_api_key = "813bb17cd2704c12a2acf66732f973bc"  # Replace with your key
-    full_name = stock_name
-    query = f'"{full_name}" OR "{ticker}"'
-    
-    # Get news from the last 7 days
-    date_from = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    
-    params = {
-        'q': query,
-        'language': 'en',
-        'sortBy': 'relevancy',
-        'pageSize': 10,
-        'apiKey': news_api_key,
-        'from': date_from,
-        'qInTitle': stock_name
-    }
-
+def get_stock_data(symbol, period="1y"):
+    """Fetch stock data from Yahoo Finance"""
     try:
-        response = requests.get("https://newsapi.org/v2/everything", params=params)
-        response.raise_for_status()
-        articles = response.json().get('articles', [])
-        
-        # Strict relevance filtering
-        filtered = []
-        for article in articles:
-            title = article.get('title', '').lower() if article.get('title') else ""
-            desc = article.get('description', '').lower() if article.get('description') else ""
-            
-            # Check if the stock name or ticker is mentioned in the title or description
-            if any([full_name.lower() in title, ticker.lower() in title, full_name.lower() in desc, ticker.lower() in desc]):
-                filtered.append(article)
-        
-        return filtered[:5]
-
+        stock = yf.Ticker(symbol)
+        df = stock.history(period=period)
+        return df
     except Exception as e:
-        st.error(f"News API Error: {e}")
+        st.error(f"Error fetching data for {symbol}: {str(e)}")
+        return None
+
+def get_news(symbol):
+    """Fetch news articles for the selected stock"""
+    try:
+        # Replace with your News API key
+        api_key = "813bb17cd2704c12a2acf66732f973bc"
+        url = f"https://newsapi.org/v2/everything?q={symbol}&apiKey={api_key}&language=en&sortBy=publishedAt&pageSize=5"
+        response = requests.get(url)
+        news_data = response.json()
+        
+        if news_data.get('status') == 'ok' and news_data.get('articles'):
+            return news_data['articles']
+        return []
+    except Exception as e:
+        st.error(f"Error fetching news: {str(e)}")
         return []
 
-# Main App
 def main():
-    st.title(f"{selected_stock_name} Analysis")
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    # Data Loading
-    with st.spinner('Loading market data...'):
-        df, info = fetch_stock_data(selected_stock, selected_period)
-
-    if df is None or df.empty:
-        st.warning("No data available for the selected stock")
-        return
-
-    # Key Metrics Grid
-    st.subheader("Key Metrics")
-    cols = st.columns(4)
-    metrics = [
-        ("Current Price", f"₹{df['Close'].iloc[-1]:,.2f}"),
-        ("Market Cap", f"₹{info.get('marketCap', 0)/1e7:,.1f} Cr"),
-        ("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,.2f}"),
-        ("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,.2f}")
+    st.title("📈 Stock Market Dashboard")
+    
+    # Sidebar
+    st.sidebar.header("Settings")
+    
+    # Stock selection
+    stock_list = [
+        "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+        "HINDUNILVR.NS", "SBIN.NS", "BHARTIARTL.NS", "ITC.NS", "KOTAKBANK.NS"
     ]
-
-    for col, (label, value) in zip(cols, metrics):
-        with col:
+    selected_stock = st.sidebar.selectbox("Select Stock", stock_list)
+    
+    # Time period selection
+    time_period = st.sidebar.selectbox(
+        "Select Time Period",
+        ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"],
+        index=3
+    )
+    
+    # Fetch stock data
+    df = get_stock_data(selected_stock, time_period)
+    
+    if df is not None and not df.empty:
+        # Display stock information
+        st.header(f"{selected_stock.replace('.NS', '')} Stock Analysis")
+        
+        # Key metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            current_price = df['Close'].iloc[-1]
             st.markdown(f"""
             <div class="metric-card">
-                <h3>{label}</h3>
-                <p style="font-size: 1.5rem; margin: 0.5rem 0;">{value}</p>
+                <h3>Current Price</h3>
+                <p style="font-size: 1.5rem; margin: 0.5rem 0;">₹{current_price:,.2f}</p>
             </div>
             """, unsafe_allow_html=True)
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    
-    # Price chart with Bollinger Bands
-    st.subheader("Price Movement")
-    fig = go.Figure()
-    fig.add_trace(go.Candlestick(
-        x=df.index,
-        open=df['Open'],
-        high=df['High'],
-        low=df['Low'],
-        close=df['Close'],
-        name='Price'
-    ))
-
-    if candlestick_ma:
-        for days, color in [(20, '#FFA726'), (50, '#26C6DA')]:
-            ma = df['Close'].rolling(days).mean()
-            fig.add_trace(go.Scatter(
-                x=df.index,
-                y=ma,
-                name=f'{days} MA',
-                line=dict(color=color, width=2)
-            ))
-
-    if show_bollinger:
-        window = 20
-        sma = df['Close'].rolling(window).mean()
-        std = df['Close'].rolling(window).std()
-        upper_band = sma + 2 * std
-        lower_band = sma - 2 * std
         
-        fig.add_trace(go.Scatter(
-            x=df.index,
-            y=sma,
-            line=dict(color='#FF6F00', width=1.5),
-            name='Bollinger Middle (20 SMA)'
-        ))
-        fig.add_trace(go.Scatter(
-            x=df.index,
-            y=upper_band,
-            line=dict(color='#4CAF50', width=1.5),
-            name='Upper Band (2σ)',
-            fill=None
-        ))
-        fig.add_trace(go.Scatter(
-            x=df.index,
-            y=lower_band,
-            line=dict(color='#F44336', width=1.5),
-            name='Lower Band (2σ)',
-            fill='tonexty',
-            fillcolor='rgba(76, 175, 80, 0.1)'
-        ))
-
-    fig.update_layout(
-        template="plotly_dark",
-        height=600,
-        hovermode="x unified",
-        showlegend=True,
-        xaxis_rangeslider_visible=False,
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # RSI Chart
-    if show_rsi:
-        def calculate_rsi(data, window=14):
-            delta = data['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-            rs = gain / loss
-            return 100 - (100 / (1 + rs))
-
-        rsi = calculate_rsi(df)
-        
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.subheader("Relative Strength Index (RSI)")
-        fig_rsi = go.Figure()
-        fig_rsi.add_trace(go.Scatter(
-            x=df.index,
-            y=rsi,
-            line=dict(color='#8A2BE2', width=2),
-            name='RSI'
-        ))
-        fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold")
-        fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought")
-        fig_rsi.update_layout(
-            height=400,
-            template="plotly_dark",
-            showlegend=False,
-            margin=dict(l=20, r=20, t=40, b=20),
-            yaxis_title="RSI"
-        )
-        st.plotly_chart(fig_rsi, use_container_width=True)
-
-    # Volume chart and news sections remain the same...
-
-    # Volume Chart
-    st.subheader("Trading Volume")
-    fig = go.Figure(go.Bar(
-        x=df.index,
-        y=df['Volume'],
-        marker=dict(color='rgba(255, 99, 132, 0.6)'),
-        name="Volume"
-    ))
-    fig.update_layout(
-        template="plotly_dark",
-        height=400,
-        showlegend=False,
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    # Display News
-    st.subheader("Latest News")
-    with st.spinner("Loading news and analyzing sentiment..."):
-        news_articles = get_relevant_news(selected_stock_name, selected_stock)
-        analyzer = get_finbert_analyzer()
-    
-    if news_articles:
-        for article in news_articles:
-            title = article.get('title', '')
-            description = article.get('description', '')
-            url = article.get('url', '')
-            
-            # Analyze sentiment using FinBERT
-            title_sentiment, title_confidence = analyzer.analyze_sentiment(title)
-            desc_sentiment, desc_confidence = analyzer.analyze_sentiment(description)
-            
-            # Determine overall sentiment (weighted by confidence)
-            overall_confidence = (title_confidence + desc_confidence) / 2
-            
-            # Map sentiment to colors
-            sentiment_colors = {
-                "positive": "#4CAF50",  # Green
-                "negative": "#F44336",  # Red
-                "neutral": "#FFC107"    # Yellow
-            }
-            
-            # Use the sentiment with higher confidence
-            final_sentiment = title_sentiment if title_confidence > desc_confidence else desc_sentiment
-            sentiment_color = sentiment_colors[final_sentiment]
-            
+        with col2:
+            daily_change = ((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) * 100
+            color = "green" if daily_change >= 0 else "red"
             st.markdown(f"""
-            <div class="news-card">
-                <h3><a href="{url}" target="_blank">{title}</a></h3>
-                <p>{description}</p>
-                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                    <span style="background-color: {sentiment_color}; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem;">
-                        Sentiment: {final_sentiment.title()} (Confidence: {overall_confidence:.2%})
-                    </span>
-                </div>
+            <div class="metric-card">
+                <h3>Daily Change</h3>
+                <p style="font-size: 1.5rem; margin: 0.5rem 0; color: {color}">
+                    {daily_change:+.2f}%
+                </p>
             </div>
             """, unsafe_allow_html=True)
+        
+        with col3:
+            volume = df['Volume'].iloc[-1]
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>Volume</h3>
+                <p style="font-size: 1.5rem; margin: 0.5rem 0;">{volume:,.0f}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            high = df['High'].iloc[-1]
+            low = df['Low'].iloc[-1]
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>High/Low</h3>
+                <p style="font-size: 1.5rem; margin: 0.5rem 0;">₹{high:,.2f}/₹{low:,.2f}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Price chart
+        st.subheader("Price Chart")
+        fig = go.Figure(data=[go.Candlestick(
+            x=df.index,
+            open=df['Open'],
+            high=df['High'],
+            low=df['Low'],
+            close=df['Close']
+        )])
+        
+        fig.update_layout(
+            template="plotly_dark",
+            height=500,
+            xaxis_title="Date",
+            yaxis_title="Price (₹)",
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Add Prediction Section
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        st.subheader("Price Prediction")
+        
+        with st.spinner("Generating price prediction..."):
+            try:
+                predictor = get_stock_predictor()
+                prediction_result = predictor.predict(selected_stock)
+                
+                if prediction_result:
+                    current_price = prediction_result['current_price']
+                    predicted_price = prediction_result['predicted_price']
+                    news_count = prediction_result['news_count']
+                    
+                    # Calculate percentage change
+                    price_change = ((predicted_price - current_price) / current_price) * 100
+                    
+                    # Create prediction cards
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3>Current Price</h3>
+                            <p style="font-size: 1.5rem; margin: 0.5rem 0;">₹{current_price:,.2f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3>Predicted Price</h3>
+                            <p style="font-size: 1.5rem; margin: 0.5rem 0;">₹{predicted_price:,.2f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col3:
+                        color = "green" if price_change >= 0 else "red"
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3>Predicted Change</h3>
+                            <p style="font-size: 1.5rem; margin: 0.5rem 0; color: {color}">
+                                {price_change:+.2f}%
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Add prediction confidence indicator with news status
+                    confidence_text = "Based on technical analysis only" if news_count == 0 else f"Based on analysis of {news_count} recent news articles"
+                    confidence_color = "orange" if news_count == 0 else "green"
+                    
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3>Prediction Details</h3>
+                        <p style="color: {confidence_color}">{confidence_text}</p>
+                        <p>Model confidence: {abs(price_change):.1f}%</p>
+                        <p style="font-size: 0.9rem; color: #888;">
+                            {f"Note: No recent news articles found. Prediction based on historical price patterns." if news_count == 0 else ""}
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Add prediction chart
+                    fig_pred = go.Figure()
+                    
+                    # Add historical price data
+                    fig_pred.add_trace(go.Scatter(
+                        x=df.index[-30:],  # Last 30 days
+                        y=df['Close'].iloc[-30:],
+                        mode='lines',
+                        name='Historical Price',
+                        line=dict(color='gray', width=1)
+                    ))
+                    
+                    # Add current price point
+                    fig_pred.add_trace(go.Scatter(
+                        x=[df.index[-1]],
+                        y=[current_price],
+                        mode='markers',
+                        name='Current Price',
+                        marker=dict(size=10, color='blue')
+                    ))
+                    
+                    # Add predicted price point
+                    next_date = df.index[-1] + pd.Timedelta(days=1)
+                    fig_pred.add_trace(go.Scatter(
+                        x=[next_date],
+                        y=[predicted_price],
+                        mode='markers',
+                        name='Predicted Price',
+                        marker=dict(size=10, color='green' if price_change >= 0 else 'red')
+                    ))
+                    
+                    # Add line connecting points
+                    fig_pred.add_trace(go.Scatter(
+                        x=[df.index[-1], next_date],
+                        y=[current_price, predicted_price],
+                        mode='lines',
+                        name='Price Movement',
+                        line=dict(color='green' if price_change >= 0 else 'red', dash='dash')
+                    ))
+                    
+                    fig_pred.update_layout(
+                        template="plotly_dark",
+                        height=400,
+                        showlegend=True,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        title="Price Prediction Trend",
+                        xaxis_title="Date",
+                        yaxis_title="Price (₹)"
+                    )
+                    
+                    st.plotly_chart(fig_pred, use_container_width=True)
+                    
+                else:
+                    st.warning("Unable to generate prediction at this time. Please try again later.")
+                    
+            except Exception as e:
+                st.error(f"Error generating prediction: {str(e)}")
+                st.info("""
+                This could be due to:
+                - Network connectivity issues
+                - Limited availability of market data
+                - Model loading issues
+                Please try again in a few minutes.
+                """)
+        
+        # News Section
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        st.subheader("Latest News")
+        
+        news_articles = get_news(selected_stock)
+        if news_articles:
+            analyzer = get_finbert_analyzer()
+            
+            for article in news_articles:
+                with st.expander(f"📰 {article['title']}", expanded=False):
+                    st.write(article['description'])
+                    st.markdown(f"[Read more]({article['url']})")
+                    
+                    # Analyze sentiment
+                    try:
+                        sentiment = analyzer.analyze(article['title'] + " " + article['description'])
+                        sentiment_color = "green" if sentiment > 0 else "red" if sentiment < 0 else "gray"
+                        st.markdown(f"Sentiment: <span style='color: {sentiment_color}'>{'Positive' if sentiment > 0 else 'Negative' if sentiment < 0 else 'Neutral'}</span>", unsafe_allow_html=True)
+                    except Exception as e:
+                        st.warning("Unable to analyze sentiment for this article.")
+        else:
+            st.info("No recent news articles found for this stock.")
+    
     else:
-        st.warning("No news found for the selected stock.")
+        st.error("Unable to fetch stock data. Please try again later.")
 
 if __name__ == "__main__":
-    main()
+    main() 
