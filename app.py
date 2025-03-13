@@ -287,7 +287,8 @@ def main():
                 prediction_result = predictor.predict(selected_stock)
                 
                 if prediction_result:
-                    current_price = prediction_result['current_price']
+                    # Use the same current price as displayed in key metrics
+                    current_price = df['Close'].iloc[-1]
                     predicted_price = prediction_result['predicted_price']
                     news_count = prediction_result['news_count']
                     
