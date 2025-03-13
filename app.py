@@ -329,6 +329,14 @@ def main():
                     predicted_price = prediction_result['predicted_price']
                     news_count = prediction_result['news_count']
                     
+                    # Print debug information
+                    st.sidebar.markdown(f"""
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 1rem;">
+                    Debug info:
+                    - Prediction uses {news_count} news articles
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     # Calculate percentage change
                     price_change = ((predicted_price - current_price) / current_price) * 100
                     
