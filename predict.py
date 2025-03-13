@@ -124,7 +124,10 @@ class StockPredictor:
             prediction = self.model(features, sentiment)
         
         # Inverse transform the prediction
-        prediction = self.scaler.inverse_transform([[prediction.item()]])[0][0]
+        # Create a dummy array with zeros for other features
+        dummy_array = np.zeros((1, 5))  # 5 features: Open, High, Low, Close, Volume
+        dummy_array[0, 3] = prediction.item()  # 3 is the index for Close price
+        prediction = self.scaler.inverse_transform(dummy_array)[0, 3]  # Get back the Close price
         
         return {
             'predicted_price': prediction,
