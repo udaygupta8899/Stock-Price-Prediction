@@ -6,7 +6,6 @@ requests
 ta
 transformers
 torchvision
-
 torch>=1.9.0
 pytorch-lightning>=1.5.0
 numpy>=1.19.0
@@ -15,4 +14,3 @@ joblib>=1.0.0
 h5py>=3.3.0
 datasets>=2.12.0
 newsapi-python>=0.2.7
-finbert-analyzer>=0.1.0
