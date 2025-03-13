@@ -68,13 +68,29 @@ class StockPredictor:
     
     def _get_mock_news(self, symbol):
         """Return mock news for when the News API fails"""
+        current_date = datetime.now().strftime("%Y-%m-%d")
         company_name = symbol.split('.')[0]
+        
+        # Create mock news in dictionary format to match app.py's format
         mock_news = [
-            f"{company_name} shows strong quarterly performance with revenue growth",
-            f"Market analysts remain positive about {company_name}'s future prospects",
-            f"{company_name} continues to invest in technology and innovation",
-            f"Economic outlook to benefit companies like {company_name} in coming months",
-            f"{company_name} announces expansion plans for the upcoming fiscal year"
+            {
+                "title": f"{company_name} shows strong quarterly performance",
+                "description": f"The company reported better than expected earnings with significant growth in key segments. Analysts remain positive about {company_name}'s outlook for the upcoming fiscal year.",
+                "url": "#",
+                "publishedAt": current_date
+            },
+            {
+                "title": f"Analysts recommend buying {company_name} shares",
+                "description": f"Multiple financial institutions have upgraded their rating for {company_name}, citing strong fundamentals and positive growth indicators in the current market environment.",
+                "url": "#",
+                "publishedAt": current_date
+            },
+            {
+                "title": f"{company_name} announces expansion plans",
+                "description": f"The company has unveiled plans to expand its operations into new markets, which could drive significant revenue growth in the coming years.",
+                "url": "#",
+                "publishedAt": current_date
+            }
         ]
         return mock_news
     
@@ -109,21 +125,39 @@ class StockPredictor:
         
         return features, sentiment
     
-    def predict(self, symbol):
-        """Make prediction for a specific stock"""
+    def predict(self, symbol, external_news=None):
+        """Make prediction for a specific stock
+        
+        Args:
+            symbol: Stock symbol
+            external_news: Optional list of news articles from external source (e.g., app.py)
+                           If provided, these will be used instead of fetching news internally
+        """
         # Get stock data
         df = self.get_stock_data(symbol)
         if df is None:
             return None
         
-        # Get news data
-        news_articles = self.get_news_data(symbol)
-        print(f"Retrieved {len(news_articles)} news articles for {symbol}")
+        # Get news data - either from external source or fetch it internally
+        if external_news is not None:
+            news_articles = external_news
+            print(f"Using {len(news_articles)} externally provided news articles for {symbol}")
+        else:
+            news_articles = self.get_news_data(symbol)
+            print(f"Fetched {len(news_articles)} news articles for {symbol}")
         
         # Get sentiment embeddings for all articles
         sentiment_embeddings = []
         for article in news_articles:
-            embedding = self.get_sentiment_embedding(article)
+            # Handle different formats of news (plain text vs dictionary)
+            if isinstance(article, dict):
+                # Format from app.py: extract title and description
+                text = f"{article.get('title', '')} {article.get('description', '')}"
+            else:
+                # Plain text format from predict.py
+                text = article
+                
+            embedding = self.get_sentiment_embedding(text)
             sentiment_embeddings.append(embedding)
         
         # If no news articles, use zero embedding
@@ -157,17 +191,10 @@ class StockPredictor:
                 adjustment_factor = 1.0 / adjustment_factor
             prediction = original_current_price * adjustment_factor
         
-        # Ensure news_count is at least the number of mock news articles when using fallback
-        actual_news_count = len(news_articles)
-        if isinstance(news_articles, list) and actual_news_count > 0:
-            # This ensures we recognize when we're using mock news
-            is_mock_news = len(news_articles) > 0 and isinstance(news_articles[0], str) and news_articles[0].startswith(symbol.split('.')[0])
-            print(f"Using {'mock' if is_mock_news else 'real'} news for {symbol}, count: {actual_news_count}")
-        
         return {
             'predicted_price': prediction,
             'current_price': original_current_price,
-            'news_count': actual_news_count
+            'news_count': len(news_articles)
         }
 
 def main():
