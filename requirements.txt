@@ -1,0 +1,9 @@
+streamlit
+yfinance
+pandas
+plotly
+requests
+ta
+transformers
+torch
+torchvision
