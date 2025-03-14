@@ -235,7 +235,7 @@ def get_relevant_news(stock_name, ticker):
     }
 
     try:
-        response = requests.get("https://api.thenewsapi.com/v1/news/all?api_token=XGSOL59RShnHWDB1JKi73vDqu2kXAj3aDkzF0ueT&search=full_name")
+        response = requests.get("https://newsapi.org/v2/everything", params=params)
         response.raise_for_status()
         articles = response.json().get('articles', [])
         
