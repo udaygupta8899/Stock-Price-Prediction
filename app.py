@@ -213,37 +213,31 @@ def fetch_stock_data(symbol, period):
     st.error("Failed to fetch stock data after multiple attempts.")
     return None, None
 
-# Improved news filtering using GNews API
+# Modified news filtering using GNews API with urllib.request
 def get_relevant_news(stock_name, ticker):
     gnews_api_key = os.getenv("NEWS_API_KEY")  # GNews API key from environment
     if not gnews_api_key:
         st.warning("GNEWS_API_KEY not found. Using mock news data.")
         return get_mock_news(stock_name, ticker)
-        
+    
     full_name = stock_name
     query = f'"{full_name}" OR "{ticker}"'
-    
-    # Construct parameters for GNews API
-    params = {
-        'q': query,
-        'token': gnews_api_key,
-        'lang': 'en',
-        'max': 10  # maximum number of articles to retrieve
-    }
+    # URL encode the query
+    import urllib.parse
+    encoded_query = urllib.parse.quote(query)
+    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&country=us&max=10&apikey={gnews_api_key}"
     
     try:
-        response = requests.get("https://gnews.io/api/v4/search", params=params)
-        response.raise_for_status()
-        data = response.json()
-        articles = data.get('articles', [])
+        import json, urllib.request
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            articles = data.get("articles", [])
         
         # Strict relevance filtering
         filtered = []
         for article in articles:
             title = article.get('title', '').lower() if article.get('title') else ""
             desc = article.get('description', '').lower() if article.get('description') else ""
-            
-            # Check if the stock name or ticker is mentioned in the title or description
             if any([full_name.lower() in title, ticker.lower() in title, full_name.lower() in desc, ticker.lower() in desc]):
                 filtered.append(article)
         
