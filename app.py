@@ -225,7 +225,14 @@ def get_relevant_news(stock_name, ticker):
     # URL encode the query
     import urllib.parse
     encoded_query = urllib.parse.quote(query)
-    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&country=us&max=10&apikey={gnews_api_key}"
+    
+    # Add a date filter: only fetch articles from the last 7 days
+    from_date = (datetime.utcnow() - timedelta(days=7)).isoformat() + "Z"
+    
+    url = (
+        f"https://gnews.io/api/v4/search?q={encoded_query}"
+        f"&lang=en&country=us&max=10&from={from_date}&apikey={gnews_api_key}"
+    )
     
     try:
         import json, urllib.request
@@ -246,6 +253,7 @@ def get_relevant_news(stock_name, ticker):
     except Exception as e:
         st.warning(f"GNews API unavailable: {e}. Using mock news data.")
         return get_mock_news(stock_name, ticker)
+
 
 def get_mock_news(stock_name, ticker):
     """Generate mock news articles for when the News API fails"""
