@@ -215,7 +215,7 @@ def fetch_stock_data(symbol, period):
 
 # Modified news filtering using GNews API with urllib.request
 def get_relevant_news(stock_name, ticker):
-    gnews_api_key = os.getenv("NEWS_API_KEY")  # GNews API key from environment
+    gnews_api_key = os.getenv("GNEWS_API_KEY")  # GNews API key from environment
     if not gnews_api_key:
         st.warning("GNEWS_API_KEY not found. Using mock news data.")
         return get_mock_news(stock_name, ticker)
@@ -226,9 +226,8 @@ def get_relevant_news(stock_name, ticker):
     import urllib.parse
     encoded_query = urllib.parse.quote(query)
     
-    # Add a date filter: only fetch articles from the last 7 days
+    # Attempt to use API date filter: only fetch articles from the last 7 days
     from_date = (datetime.utcnow() - timedelta(days=7)).isoformat() + "Z"
-    
     url = (
         f"https://gnews.io/api/v4/search?q={encoded_query}"
         f"&lang=en&country=us&max=10&from={from_date}&apikey={gnews_api_key}"
@@ -240,11 +239,25 @@ def get_relevant_news(stock_name, ticker):
             data = json.loads(response.read().decode("utf-8"))
             articles = data.get("articles", [])
         
-        # Strict relevance filtering
+        # Manual filtering: only include articles with published dates in the last 7 days
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
         filtered = []
         for article in articles:
+            published_at_str = article.get("publishedAt", "")
+            if published_at_str:
+                try:
+                    # Parse publishedAt; expected format "YYYY-MM-DDTHH:MM:SSZ"
+                    published_at = datetime.strptime(published_at_str, "%Y-%m-%dT%H:%M:%SZ")
+                except Exception as e:
+                    continue  # Skip if parsing fails
+                if published_at < cutoff_date:
+                    continue  # Skip articles older than 7 days
+            else:
+                continue  # Skip if no published date is available
+
             title = article.get('title', '').lower() if article.get('title') else ""
             desc = article.get('description', '').lower() if article.get('description') else ""
+            # Check if the stock name or ticker is mentioned in the title or description
             if any([full_name.lower() in title, ticker.lower() in title, full_name.lower() in desc, ticker.lower() in desc]):
                 filtered.append(article)
         
@@ -253,6 +266,7 @@ def get_relevant_news(stock_name, ticker):
     except Exception as e:
         st.warning(f"GNews API unavailable: {e}. Using mock news data.")
         return get_mock_news(stock_name, ticker)
+
 
 
 def get_mock_news(stock_name, ticker):
