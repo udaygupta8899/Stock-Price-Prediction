@@ -213,31 +213,29 @@ def fetch_stock_data(symbol, period):
     st.error("Failed to fetch stock data after multiple attempts.")
     return None, None
 
-
-# Improved news filtering
-# Improved news filtering using full company name and ticker symbol
+# Improved news filtering using GNews API
 def get_relevant_news(stock_name, ticker):
-    news_api_key = os.getenv("NEWS_API_KEY")  # Updated API key
+    gnews_api_key = os.getenv("NEWS_API_KEY")  # GNews API key from environment
+    if not gnews_api_key:
+        st.warning("GNEWS_API_KEY not found. Using mock news data.")
+        return get_mock_news(stock_name, ticker)
+        
     full_name = stock_name
     query = f'"{full_name}" OR "{ticker}"'
     
-    # Get news from the last 7 days
-    date_from = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    
+    # Construct parameters for GNews API
     params = {
         'q': query,
-        'language': 'en',
-        'sortBy': 'relevancy',
-        'pageSize': 10,
-        'apiKey': news_api_key,
-        'from': date_from,
-        'qInTitle': stock_name
+        'token': gnews_api_key,
+        'lang': 'en',
+        'max': 10  # maximum number of articles to retrieve
     }
-
+    
     try:
-        response = requests.get("https://newsapi.org/v2/everything", params=params)
+        response = requests.get("https://gnews.io/api/v4/search", params=params)
         response.raise_for_status()
-        articles = response.json().get('articles', [])
+        data = response.json()
+        articles = data.get('articles', [])
         
         # Strict relevance filtering
         filtered = []
@@ -250,9 +248,9 @@ def get_relevant_news(stock_name, ticker):
                 filtered.append(article)
         
         return filtered[:5]
-
+    
     except Exception as e:
-        st.warning(f"News API unavailable: {e}. Using mock news data.")
+        st.warning(f"GNews API unavailable: {e}. Using mock news data.")
         return get_mock_news(stock_name, ticker)
 
 def get_mock_news(stock_name, ticker):
@@ -565,75 +563,4 @@ def main():
         fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought")
         fig_rsi.update_layout(
             height=400,
-            template="plotly_dark",
-            showlegend=False,
-            margin=dict(l=20, r=20, t=40, b=20),
-            yaxis_title="RSI"
-        )
-        st.plotly_chart(fig_rsi, use_container_width=True)
-
-    # Volume Chart
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.subheader("Trading Volume")
-    fig = go.Figure(go.Bar(
-        x=df.index,
-        y=df['Volume'],
-        marker=dict(color='rgba(255, 99, 132, 0.6)'),
-        name="Volume"
-    ))
-    fig.update_layout(
-        template="plotly_dark",
-        height=400,
-        showlegend=False,
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    # Display News
-    st.subheader("Latest News")
-    with st.spinner("Loading news and analyzing sentiment..."):
-        news_articles = get_relevant_news(selected_stock_name, selected_stock)
-        analyzer = get_finbert_analyzer()
-    
-    if news_articles:
-        for article in news_articles:
-            title = article.get('title', '')
-            description = article.get('description', '')
-            url = article.get('url', '')
-            
-            # Analyze sentiment using FinBERT
-            title_sentiment, title_confidence = analyzer.analyze_sentiment(title)
-            desc_sentiment, desc_confidence = analyzer.analyze_sentiment(description)
-            
-            # Determine overall sentiment (weighted by confidence)
-            overall_confidence = (title_confidence + desc_confidence) / 2
-            
-            # Map sentiment to colors
-            sentiment_colors = {
-                "positive": "#4CAF50",  # Green
-                "negative": "#F44336",  # Red
-                "neutral": "#FFC107"    # Yellow
-            }
-            
-            # Use the sentiment with higher confidence
-            final_sentiment = title_sentiment if title_confidence > desc_confidence else desc_sentiment
-            sentiment_color = sentiment_colors[final_sentiment]
-            
-            st.markdown(f"""
-            <div class="news-card">
-                <h3><a href="{url}" target="_blank">{title}</a></h3>
-                <p>{description}</p>
-                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                    <span style="background-color: {sentiment_color}; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem;">
-                        Sentiment: {final_sentiment.title()} (Confidence: {overall_confidence:.2%})
-                    </span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.warning("No news found for the selected stock.")
-
-if __name__ == "__main__":
-    main() 
+            template="plotly_d
