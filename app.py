@@ -215,7 +215,7 @@ def fetch_stock_data(symbol, period):
 
 # Modified news filtering using GNews API with urllib.request
 def get_relevant_news(stock_name, ticker):
-    gnews_api_key = os.getenv("GNEWS_API_KEY")  # GNews API key from environment
+    gnews_api_key = os.getenv("NEWS_API_KEY")  # GNews API key from environment
     if not gnews_api_key:
         st.warning("GNEWS_API_KEY not found. Using mock news data.")
         return get_mock_news(stock_name, ticker)
