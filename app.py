@@ -563,4 +563,75 @@ def main():
         fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought")
         fig_rsi.update_layout(
             height=400,
-            template="plotly_d
+            template="plotly_dark",
+            showlegend=False,
+            margin=dict(l=20, r=20, t=40, b=20),
+            yaxis_title="RSI"
+        )
+        st.plotly_chart(fig_rsi, use_container_width=True)
+
+    # Volume Chart
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.subheader("Trading Volume")
+    fig = go.Figure(go.Bar(
+        x=df.index,
+        y=df['Volume'],
+        marker=dict(color='rgba(255, 99, 132, 0.6)'),
+        name="Volume"
+    ))
+    fig.update_layout(
+        template="plotly_dark",
+        height=400,
+        showlegend=False,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    # Display News
+    st.subheader("Latest News")
+    with st.spinner("Loading news and analyzing sentiment..."):
+        news_articles = get_relevant_news(selected_stock_name, selected_stock)
+        analyzer = get_finbert_analyzer()
+    
+    if news_articles:
+        for article in news_articles:
+            title = article.get('title', '')
+            description = article.get('description', '')
+            url = article.get('url', '')
+            
+            # Analyze sentiment using FinBERT
+            title_sentiment, title_confidence = analyzer.analyze_sentiment(title)
+            desc_sentiment, desc_confidence = analyzer.analyze_sentiment(description)
+            
+            # Determine overall sentiment (weighted by confidence)
+            overall_confidence = (title_confidence + desc_confidence) / 2
+            
+            # Map sentiment to colors
+            sentiment_colors = {
+                "positive": "#4CAF50",  # Green
+                "negative": "#F44336",  # Red
+                "neutral": "#FFC107"    # Yellow
+            }
+            
+            # Use the sentiment with higher confidence
+            final_sentiment = title_sentiment if title_confidence > desc_confidence else desc_sentiment
+            sentiment_color = sentiment_colors[final_sentiment]
+            
+            st.markdown(f"""
+            <div class="news-card">
+                <h3><a href="{url}" target="_blank">{title}</a></h3>
+                <p>{description}</p>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <span style="background-color: {sentiment_color}; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem;">
+                        Sentiment: {final_sentiment.title()} (Confidence: {overall_confidence:.2%})
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.warning("No news found for the selected stock.")
+
+if __name__ == "__main__":
+    main()
