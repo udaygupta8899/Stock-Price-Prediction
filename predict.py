@@ -8,6 +8,10 @@ import pytorch_lightning as pl
 from tft_model import TemporalFusionTransformer
 import joblib
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class StockPredictor:
     def __init__(self, model_path, scaler_path):

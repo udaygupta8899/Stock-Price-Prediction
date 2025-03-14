@@ -10,7 +10,10 @@ from finbert_analyzer import FinBERTAnalyzer
 import torch
 from predict import StockPredictor
 import numpy as np
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Initialize FinBERT analyzer
 @st.cache_resource
 def get_finbert_analyzer():
@@ -214,7 +217,7 @@ def fetch_stock_data(symbol, period):
 # Improved news filtering
 # Improved news filtering using full company name and ticker symbol
 def get_relevant_news(stock_name, ticker):
-    news_api_key = "af4bb2e268994e48899adbd3cd949b75"  # Updated API key
+    news_api_key = os.getenv("NEWS_API_KEY")  # Updated API key
     full_name = stock_name
     query = f'"{full_name}" OR "{ticker}"'
     
