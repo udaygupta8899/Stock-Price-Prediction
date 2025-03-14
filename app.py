@@ -220,34 +220,32 @@ def get_relevant_news(stock_name, ticker):
         st.warning("POLYGON_API_KEY not found. Using mock news data.")
         return get_mock_news(stock_name, ticker)
     
-    # Calculate the from_date as 7 days ago in YYYY-MM-DD format.
+    # Calculate from_date as 7 days ago in YYYY-MM-DD format.
     from_date = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
     
-    # Build the URL to fetch news for the given ticker from Polygon.io
+    # Use the singular parameter "ticker" required by Polygon.io.
     url = (
         f"https://api.polygon.io/v2/reference/news?"
-        f"tickers={ticker}&published_utc.gte={from_date}&limit=10&apiKey={polygon_api_key}"
+        f"ticker={ticker}&published_utc.gte={from_date}&limit=10&apiKey={polygon_api_key}"
     )
     
     try:
         import json, urllib.request
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode("utf-8"))
-            # Polygon returns news articles in the "results" field
             articles = data.get("results", [])
         
         if not articles:
             st.warning("No news articles returned from Polygon.io, using mock news data.")
             return get_mock_news(stock_name, ticker)
         
-        # Manual filtering: include only articles from the past 7 days and with relevant content.
+        # Manual filtering: ensure the articles are recent and contain the stock name or ticker.
         cutoff_date = datetime.utcnow() - timedelta(days=7)
         filtered = []
         for article in articles:
             published_at_str = article.get("published_utc", "")
             if published_at_str:
                 try:
-                    # Polygon's published_utc format is usually "YYYY-MM-DDTHH:MM:SS.mmmZ"
                     published_at = datetime.strptime(published_at_str, "%Y-%m-%dT%H:%M:%S.%fZ")
                 except Exception:
                     try:
@@ -259,9 +257,13 @@ def get_relevant_news(stock_name, ticker):
             
             title = article.get("title", "").lower() if article.get("title") else ""
             desc = article.get("description", "").lower() if article.get("description") else ""
-            # Check if the stock name or ticker is mentioned in the title or description.
-            if any([stock_name.lower() in title, ticker.lower() in title, stock_name.lower() in desc, ticker.lower() in desc]):
+            if any([stock_name.lower() in title, ticker.lower() in title, 
+                    stock_name.lower() in desc, ticker.lower() in desc]):
                 filtered.append(article)
+        
+        if not filtered:
+            st.warning("No recent relevant news articles found from Polygon.io, using mock news data.")
+            return get_mock_news(stock_name, ticker)
         
         return filtered[:5]
     
